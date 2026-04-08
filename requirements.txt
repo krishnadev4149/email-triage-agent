@@ -1,0 +1,9 @@
+# requirements.txt
+# Minimal dependencies for the Email Triage & Response Environment.
+# This project is intentionally dependency-light — no ML frameworks needed!
+
+# PyYAML is used to parse the openenv.yaml config file if needed.
+PyYAML>=6.0
+
+# No other external libraries required.
+# All logic is implemented using Python's standard library.

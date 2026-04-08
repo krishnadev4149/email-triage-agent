@@ -1,0 +1,117 @@
+# openenv.yaml
+# OpenEnv-compatible environment configuration
+# This file describes the environment contract: what inputs/outputs look like.
+
+name: email-triage-response-env
+version: "1.0.0"
+description: >
+  An AI environment where an agent reads emails and performs:
+  (1) classification into Complaint / Query / Spam,
+  (2) priority assignment (Low / Medium / High),
+  (3) and short response generation.
+  Scoring is partial and task-difficulty-aware.
+
+author: Hackathon Team
+license: MIT
+
+# -----------------------------------------------------------------------
+# Environment entry point
+# -----------------------------------------------------------------------
+entry_point:
+  module: env
+  class: EmailEnv
+
+# -----------------------------------------------------------------------
+# Task definitions
+# -----------------------------------------------------------------------
+tasks:
+  module: tasks
+  function: get_all_tasks
+  difficulties:
+    - easy      # classification only
+    - medium    # classification + priority
+    - hard      # full pipeline
+
+# -----------------------------------------------------------------------
+# Grader
+# -----------------------------------------------------------------------
+grader:
+  module: grader
+  function: grade_action
+  score_range: [0.0, 1.0]
+  scoring_components:
+    category:
+      weight: 0.40
+      type: exact_match_case_insensitive
+    priority:
+      weight: 0.30
+      type: exact_match_with_partial_credit
+      partial_credit_rule: adjacent_level_gets_half
+    response:
+      weight: 0.30
+      type: keyword_coverage
+
+# -----------------------------------------------------------------------
+# Observation schema
+# What the agent RECEIVES from the environment at each step.
+# -----------------------------------------------------------------------
+observation_schema:
+  type: object
+  properties:
+    email:
+      type: string
+      description: The raw email text including subject and body.
+  required:
+    - email
+
+# -----------------------------------------------------------------------
+# Action schema
+# What the agent SUBMITS back to the environment.
+# -----------------------------------------------------------------------
+action_schema:
+  type: object
+  properties:
+    category:
+      type: string
+      enum: [Complaint, Query, Spam]
+      description: The type of email.
+    priority:
+      type: string
+      enum: [Low, Medium, High]
+      description: The urgency level of the email.
+    response:
+      type: string
+      description: A short plain-text reply to send to the sender.
+  required:
+    - category
+    - priority
+    - response
+
+# -----------------------------------------------------------------------
+# Reward details
+# -----------------------------------------------------------------------
+reward:
+  type: scalar
+  range: [0.0, 1.0]
+  description: >
+    Reward equals the grader score minus a small penalty (0.05) for
+    incorrect category. Clamped to [0.0, 1.0].
+  penalty_rules:
+    - condition: wrong_category
+      penalty: 0.05
+
+# -----------------------------------------------------------------------
+# Episode termination
+# -----------------------------------------------------------------------
+termination:
+  condition: all_tasks_processed
+  max_steps: 50
+
+# -----------------------------------------------------------------------
+# Runtime
+# -----------------------------------------------------------------------
+runtime:
+  language: python
+  python_version: "3.10"
+  inference_script: inference.py
+  docker_image: email-triage-env:latest
